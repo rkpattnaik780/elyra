@@ -45,14 +45,6 @@ from kubernetes import client as k8s_client
 from traitlets import default
 from traitlets import Unicode
 
-try:
-    from kfp_tekton import compiler as kfp_tekton_compiler
-    from kfp_tekton import TektonClient
-except ImportError:
-    # We may not have kfp-tekton available and that's okay!
-    kfp_tekton_compiler = None
-    TektonClient = None
-
 from elyra._version import __version__
 from elyra.metadata.schemaspaces import RuntimeImages
 from elyra.metadata.schemaspaces import Runtimes
@@ -173,11 +165,6 @@ class KfpPipelineProcessor(RuntimePipelineProcessor):
         api_password = runtime_configuration.metadata.get("api_password")
         user_namespace = runtime_configuration.metadata.get("user_namespace")
         workflow_engine = WorkflowEngineType.get_instance_by_value(runtime_configuration.metadata.get("engine", "argo"))
-        if workflow_engine == WorkflowEngineType.TEKTON and not TektonClient:
-            raise ValueError(
-                "Python package `kfp-tekton` is not installed. "
-                "Please install using `elyra[kfp-tekton]` to use Tekton engine."
-            )
 
         # unpack Cloud Object Storage configs
         cos_endpoint = runtime_configuration.metadata["cos_endpoint"]
@@ -206,22 +193,13 @@ class KfpPipelineProcessor(RuntimePipelineProcessor):
         # Create Kubeflow Client
         #############
         try:
-            if workflow_engine == WorkflowEngineType.TEKTON:
-                client = TektonClient(
-                    host=api_endpoint,
-                    cookies=auth_info.get("cookies", None),
-                    credentials=auth_info.get("credentials", None),
-                    existing_token=auth_info.get("existing_token", None),
-                    namespace=user_namespace,
-                )
-            else:
-                client = ArgoClient(
-                    host=api_endpoint,
-                    cookies=auth_info.get("cookies", None),
-                    credentials=auth_info.get("credentials", None),
-                    existing_token=auth_info.get("existing_token", None),
-                    namespace=user_namespace,
-                )
+            client = ArgoClient(
+                host=api_endpoint,
+                cookies=auth_info.get("cookies", None),
+                credentials=auth_info.get("credentials", None),
+                existing_token=auth_info.get("existing_token", None),
+                namespace=user_namespace,
+            )
         except Exception as ex:
             # a common cause of these errors is forgetting to include `/pipeline` or including it with an 's'
             api_endpoint_obj = urlsplit(api_endpoint)
@@ -494,8 +472,6 @@ class KfpPipelineProcessor(RuntimePipelineProcessor):
         )
 
         workflow_engine = WorkflowEngineType.get_instance_by_value(runtime_configuration.metadata.get("engine", "argo"))
-        if workflow_engine == WorkflowEngineType.TEKTON and not TektonClient:
-            raise ValueError("kfp-tekton not installed. Please install using elyra[kfp-tekton] to use Tekton engine.")
 
         if Path(absolute_pipeline_export_path).exists() and not overwrite:
             raise ValueError("File " + absolute_pipeline_export_path + " already exists.")
@@ -668,12 +644,7 @@ class KfpPipelineProcessor(RuntimePipelineProcessor):
                 # in the generated Python DSL "generated_pipeline"
                 pipeline_function = getattr(mod, "generated_pipeline")
                 # compile the DSL
-                if workflow_engine == WorkflowEngineType.TEKTON:
-                    kfp_tekton_compiler.TektonCompiler().compile(
-                        pipeline_function, output_file, pipeline_conf=pipeline_conf
-                    )
-                else:
-                    kfp_argo_compiler.Compiler().compile(pipeline_function, output_file, pipeline_conf=pipeline_conf)
+                kfp_argo_compiler.Compiler().compile(pipeline_function, output_file, pipeline_conf=pipeline_conf)
             except Exception as ex:
                 raise RuntimeError(
                     f"Failed to compile pipeline with workflow_engine '{workflow_engine.value}' to '{output_file}'"
