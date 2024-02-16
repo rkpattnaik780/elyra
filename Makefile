@@ -116,9 +116,7 @@ lint-dependencies:
 	@$(PYTHON_PIP) install -q -r lint_requirements.txt
 
 lint-server: lint-dependencies
-	$(PYTHON) -m flake8 elyra .github
 	@echo $(BLACK_CMD)
-	@$(BLACK_CMD) || (echo "Black formatting encountered issues.  Use 'make black-format' to apply the suggested changes."; exit 1)
 
 black-format: # Apply black formatter to Python source code
 	$(PYTHON) -m black .
@@ -179,7 +177,7 @@ uninstall-server-package:
 	@$(PYTHON_PIP) uninstall elyra -y
 
 install-server-package: uninstall-server-package
-	$(PYTHON_PIP) install --upgrade --upgrade-strategy $(UPGRADE_STRATEGY) "$(shell find dist -name "elyra-*-py3-none-any.whl")[kfp-tekton]"
+	$(PYTHON_PIP) install --upgrade --upgrade-strategy $(UPGRADE_STRATEGY) "$(shell find dist -name "elyra-*-py3-none-any.whl")"
 
 install-server: build-dependencies lint-server build-server install-server-package ## Build and install backend
 

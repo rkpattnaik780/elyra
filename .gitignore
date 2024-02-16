@@ -90,3 +90,5 @@ tsconfig.tsbuildinfo
 node_modules
 
 .vscode/
+
+run-generic-pipelines-on-kubeflow-pipelines/
