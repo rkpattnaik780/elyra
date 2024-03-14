@@ -52,6 +52,7 @@ dependencies = [
     "appengine-python-standard",
     # "kfp<2.0",
     "kfp>=2.0.0",
+    "kfp-kubernetes>=1.1.0",
     "pygithub",
     "black>=22.8.0",
 ]
