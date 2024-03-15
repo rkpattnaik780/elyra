@@ -25,6 +25,11 @@ limitations under the License.
 [![OpenSSF Best Practices](https://bestpractices.coreinfrastructure.org/projects/5761/badge)](https://bestpractices.coreinfrastructure.org/projects/5761)
 [![Gitter](https://badges.gitter.im/elyra-ai/community.svg)](https://gitter.im/elyra-ai/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
+
+### Note: 
+*This repository/project is for opendatahub-io/Data-science-pipelines v2 and workbench work only.*  
+Please refer to upstream [elyra](https://github.com/elyra-ai/elyra) for stable version.
+
 # Elyra
 
 Elyra is a set of AI-centric extensions to JupyterLab Notebooks.

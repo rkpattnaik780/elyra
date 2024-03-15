@@ -90,3 +90,6 @@ tsconfig.tsbuildinfo
 node_modules
 
 .vscode/
+
+# virtualenv
+venv/
