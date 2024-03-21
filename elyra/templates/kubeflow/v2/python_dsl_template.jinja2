@@ -73,22 +73,10 @@ def generated_pipeline(
 {%    endfor %}
 {%  endif %}
 {%  if workflow_task.task_modifiers.set_run_name %}
-{%   if workflow_engine == "tekton" %}
-    {{ task_name }}.set_env_variable(name="ELYRA_RUN_NAME", value=V1ObjectFieldSelector(field_path="metadata.annotations['pipelines.kubeflow.org/run_name']"))
-{%   else %}
     {{ task_name }}.set_env_variable(name="ELYRA_RUN_NAME", value="{{ workflow_task.task_modifiers.set_run_name }}")
-{%   endif %}
 {%  endif %}
 {%  if workflow_task.task_modifiers.disable_node_caching %}
     {{ task_name }}.execution_options.caching_strategy.max_cache_staleness = "P0D"
-{%  endif %}
-{%  if workflow_task.task_modifiers.kubernetes_secrets %}
-{%    for env_var, secret_dict in workflow_task.task_modifiers.kubernetes_secrets.items() %}
-    {{ task_name }}.set_env_variable(
-            name="{{ env_var }}",
-            value=V1EnvVarSource(secret_key_ref=V1SecretKeySelector(name="{{ secret_dict.name }}", key="{{ secret_dict.key }}")),
-        )
-{%    endfor %}
 {%  endif %}
 {%  if workflow_task.task_modifiers.kubernetes_volumes %}
 {%    for volume_path, volume_dict in workflow_task.task_modifiers.kubernetes_volumes.items() %}
@@ -155,13 +143,7 @@ def generated_pipeline(
 
 if __name__ == "__main__":
     from pathlib import Path
-{% if workflow_engine.lower() ==  "tekton" %}
-    from kfp_tekton import compiler
-
-    compiler.TektonCompiler().compile(
-{% else %}
     kfp.compiler.Compiler().compile(
-{% endif %}
         pipeline_func=generated_pipeline,
         package_path=Path(__file__).with_suffix(".yaml").name,
     )
