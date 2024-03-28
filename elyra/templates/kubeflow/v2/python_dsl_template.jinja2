@@ -4,6 +4,7 @@
 import kfp
 from kubernetes.client import *
 from kubernetes.client.models import *
+from kfp.kubernetes import secret
 
 {# Load statements for custom components                            -#}
 {# component_hash = """<TEXT>"""                                  -#}
@@ -49,7 +50,7 @@ def generated_pipeline(
     {{ task_name }}.container.set_image_pull_policy("{{ workflow_task.task_modifiers.image_pull_policy }}")
 {%  endif %}
 {%  if workflow_task.task_modifiers.object_storage_secret %}
-    {{ task_name }}.apply(kfp.aws.use_aws_secret("{{ workflow_task.task_modifiers.object_storage_secret }}"))
+    secret.use_secret_as_env({{ task_name }}, "{{ workflow_task.task_modifiers.object_storage_secret }}", { "AWS_ACCESS_KEY_ID": "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY": "AWS_SECRET_ACCESS_KEY" })
 {%  endif %}
     {{ task_name }}.set_display_name("{{ workflow_task.name | string_delimiter_safe }}")
 {%  if workflow_task.task_modifiers.cpu_request %}
@@ -77,6 +78,11 @@ def generated_pipeline(
 {%  endif %}
 {%  if workflow_task.task_modifiers.disable_node_caching %}
     {{ task_name }}.execution_options.caching_strategy.max_cache_staleness = "P0D"
+{%  endif %}
+{%  if workflow_task.task_modifiers.kubernetes_secrets %}
+{%    for env_var, secret_dict in workflow_task.task_modifiers.kubernetes_secrets.items() %}
+    secret.use_secret_as_env({{ task_name }}, "{{ secret_dict.name }}", { "{{ secret_dict.key }}" : "{{ env_var }}" })
+{%    endfor %}
 {%  endif %}
 {%  if workflow_task.task_modifiers.kubernetes_volumes %}
 {%    for volume_path, volume_dict in workflow_task.task_modifiers.kubernetes_volumes.items() %}
