@@ -1,0 +1,138 @@
+from typing import Optional
+
+from google.protobuf import json_format
+from kfp.dsl import PipelineTask
+from kfp.kubernetes import common
+from kfp.kubernetes import kubernetes_executor_config_pb2 as pb
+
+try:
+    from typing import Literal
+except ImportError:
+    from typing_extensions import Literal
+
+def add_toleration(
+    task: PipelineTask,
+    key: Optional[str] = None,
+    operator: Optional[Literal["Equal", "Exists"]] = None,
+    value: Optional[str] = None,
+    effect: Optional[Literal["NoExecute", "NoSchedule", "PreferNoSchedule"]] = None,
+    toleration_seconds: Optional[int] = None,
+):
+    """Add a `toleration<https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/>`_. to a task.
+
+    Args:
+        task:
+            Pipeline task.
+        key:
+            key is the taint key that the toleration applies to. Empty means
+            match all taint keys. If the key is empty, operator must be Exists;
+            this combination means to match all values and all keys.
+        operator:
+            operator represents a key's relationship to the value. Valid
+            operators are Exists and Equal. Defaults to Equal. Exists is
+            equivalent to wildcard for value, so that a pod can tolerate all
+            taints of a particular category.
+        value:
+            value is the taint value the toleration matches to. If the operator
+            is Exists, the value should be empty, otherwise just a regular
+            string.
+        effect:
+            effect indicates the taint effect to match. Empty means match all
+            taint effects. When specified, allowed values are NoSchedule,
+            PreferNoSchedule and NoExecute.
+        toleration_seconds:
+            toleration_seconds represents the period of time the toleration
+            (which must be of effect NoExecute, otherwise this field is ignored)
+            tolerates the taint. By default, it is not set, which means tolerate
+            the taint forever (do not evict). Zero and negative values will be
+            treated as 0 (evict immediately) by the system.
+
+    Returns:
+        Task object with added toleration.
+    """
+
+    msg = common.get_existing_kubernetes_config_as_message(task)
+    msg.tolerations.append(
+        pb.Toleration(
+            key=key,
+            operator=operator,
+            value=value,
+            effect=effect,
+            toleration_seconds=toleration_seconds,
+        )
+    )
+    task.platform_config["kubernetes"] = json_format.MessageToDict(msg)
+
+    return task
+
+
+def add_pod_label(
+    task: PipelineTask,
+    label_key: str,
+    label_value: str,
+) -> PipelineTask:
+    """Add a label to the task Pod's `metadata
+    <https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#Pod>`_.
+
+    Each label is a key-value pair, corresponding to the metadata's `ObjectMeta <https://kubernetes.io/docs/reference/kubernetes-api/common-definitions/object-meta/#ObjectMeta`_ field.
+
+    Args:
+        task: Pipeline task.
+        label_key: Key of the metadata label.
+        label_value: Value of the metadata label.
+
+    Returns:
+        Task object with an added metadata label.
+    """
+
+    msg = common.get_existing_kubernetes_config_as_message(task)
+    msg.pod_metadata.labels.update({label_key: label_value})
+    task.platform_config['kubernetes'] = json_format.MessageToDict(msg)
+
+    return task
+
+
+def add_pod_annotation(
+    task: PipelineTask,
+    annotation_key: str,
+    annotation_value: str,
+) -> PipelineTask:
+    """Add an annotation to the task Pod's `metadata
+    <https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#Pod>`_.
+
+    Each annotation is a key-value pair, corresponding to the metadata's `ObjectMeta <https://kubernetes.io/docs/reference/kubernetes-api/common-definitions/object-meta/#ObjectMeta`_ field.
+
+    Args:
+        task: Pipeline task.
+        annotation_key: Key of the metadata annotation.
+        annotation_value: Value of the metadata annotation.
+
+    Returns:
+        Task object with an added metadata annotation.
+    """
+
+    msg = common.get_existing_kubernetes_config_as_message(task)
+    msg.pod_metadata.annotations.update({annotation_key: annotation_value})
+    task.platform_config['kubernetes'] = json_format.MessageToDict(msg)
+
+    return task
+
+def set_image_pull_policy(task: PipelineTask, policy: str) -> PipelineTask:
+    """Set image pull policy for the container.
+
+    Args:
+        task: Pipeline task.
+        policy: One of `Always`, `Never`, `IfNotPresent`.
+
+    Returns:
+        Task object with an added ImagePullPolicy specification.
+    """
+    if policy not in ['Always', 'Never', 'IfNotPresent']:
+        raise ValueError(
+            'Invalid imagePullPolicy. Must be one of `Always`, `Never`, `IfNotPresent`.'
+        )
+    msg = common.get_existing_kubernetes_config_as_message(task)
+    msg.image_pull_policy = policy
+    task.platform_config['kubernetes'] = json_format.MessageToDict(msg)
+
+    return task

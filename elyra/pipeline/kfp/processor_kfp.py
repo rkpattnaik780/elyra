@@ -300,9 +300,11 @@ class KfpPipelineProcessor(RuntimePipelineProcessor):
                 # Collect pipeline configuration information
                 pipeline_conf = self._generate_pipeline_conf(pipeline=pipeline)
 
+                pipeline_dsl_helper = self._generate_pipeline_ds_helper()
+
                 # Compile the Python DSL, producing the input for the upload to
                 # Kubeflow Pipelines
-                self._compile_pipeline_dsl(pipeline_dsl, workflow_engine, pipeline_path, pipeline_conf)
+                self._compile_pipeline_dsl(pipeline_dsl,pipeline_dsl_helper, workflow_engine, pipeline_path, pipeline_conf)
 
             except RuntimeError:
                 raise
@@ -490,17 +492,30 @@ class KfpPipelineProcessor(RuntimePipelineProcessor):
                 workflow_engine=workflow_engine,
             )
 
+            pipeline_dsl_helper = self._generate_pipeline_ds_helper()
+
             if pipeline_export_format == "py":
                 # Write Python DSL to file
                 with open(absolute_pipeline_export_path, "w") as dsl_output:
                     dsl_output.write(pipeline_dsl)
+
+                directory, _ = os.path.split(absolute_pipeline_export_path)
+                # Change the filename to "sample.py"
+                new_filename = "odh_elyra_helper.py"
+                # Join the directory and new filename components back together
+                new_absolute_path = os.path.join(directory, new_filename)
+                
+                with open(new_absolute_path, "w") as dsl_output_helper:
+                    dsl_output_helper.write(pipeline_dsl_helper)
             else:
                 # Generate pipeline configuration
                 pipeline_conf = self._generate_pipeline_conf(pipeline=pipeline)
+
+                pipeline_dsl_helper = self._generate_pipeline_ds_helper()
                 #
                 # Export pipeline as static configuration file (YAML formatted)
                 # by invoking the compiler for the selected engine
-                self._compile_pipeline_dsl(pipeline_dsl, workflow_engine, absolute_pipeline_export_path, pipeline_conf)
+                self._compile_pipeline_dsl(pipeline_dsl, pipeline_dsl_helper, workflow_engine, absolute_pipeline_export_path, pipeline_conf)
         except RuntimeError:
             raise
         except Exception as ex:
@@ -528,6 +543,34 @@ class KfpPipelineProcessor(RuntimePipelineProcessor):
         envs["ELYRA_WRITABLE_CONTAINER_DIR"] = self.WCD
         return envs
 
+    def _generate_pipeline_ds_helper(
+        self,
+    ) -> str:
+        """
+        Generate helper file for Kubeflow Pipelines
+        """
+
+        loader = PackageLoader("elyra", "templates/kubeflow/v2")
+        template_env = Environment(loader=loader)
+
+        helper_template = template_env.get_template("odh_elyra_helper.jinja2")
+
+        python_dsl_helper = helper_template.render()
+
+        # Prettify generated Python DSL
+        # Defer the import to postpone logger messages: https://github.com/psf/black/issues/2058
+        import black
+
+        try:
+            python_dsl_helper = black.format_str(fix_code(python_dsl_helper), mode=black.FileMode())
+        except Exception:
+            # if an error was encountered log the generated DSL for troubleshooting
+            self.log.error("Error post-processing generated Python DSL:")
+            self.log.error(python_dsl_helper)
+            raise
+
+        return python_dsl_helper
+
     def _generate_pipeline_dsl(
         self,
         pipeline: Pipeline,
@@ -539,7 +582,7 @@ class KfpPipelineProcessor(RuntimePipelineProcessor):
         code_generation_options: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Generate Python DSL for Kubeflow Pipelines v1
+        Generate Python DSL for Kubeflow Pipelines v2
         """
         if not code_generation_options:
             code_generation_options = {}
@@ -613,7 +656,7 @@ class KfpPipelineProcessor(RuntimePipelineProcessor):
         return pipeline_dsl
 
     def _compile_pipeline_dsl(
-        self, dsl: str, workflow_engine: WorkflowEngineType, output_file: str, pipeline_conf: PipelineConf
+        self, dsl: str, dsl_helper: str, workflow_engine: WorkflowEngineType, output_file: str, pipeline_conf: PipelineConf
     ) -> None:
         """
         Compile Python DSL using the compiler for the specified workflow_engine.
@@ -638,6 +681,11 @@ class KfpPipelineProcessor(RuntimePipelineProcessor):
                 dsl_file = Path(temp_dir) / f"{module_name}.py"
                 with open(dsl_file, "w") as dsl_output:
                     dsl_output.write(dsl)
+
+                dsl_helper_file = Path(temp_dir) / "odh_elyra_helper.py"
+                with open(dsl_helper_file, "w") as dsl_helper_output:
+                    dsl_helper_output.write(dsl_helper)
+                
                 # Load DSL by importing the "generated_dsl" module.
                 mod = importlib.import_module(module_name)
                 # If this module was previously imported it won't reflect
